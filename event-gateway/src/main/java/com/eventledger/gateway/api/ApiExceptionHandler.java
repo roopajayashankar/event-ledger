@@ -1,5 +1,8 @@
 package com.eventledger.gateway.api;
 
+import com.eventledger.gateway.service.AccountNotFoundException;
+import com.eventledger.gateway.service.AccountRejectedException;
+import com.eventledger.gateway.service.AccountUnavailableException;
 import com.eventledger.gateway.service.EventNotFoundException;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,30 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleNotFound(EventNotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Event not found");
+        return problem;
+    }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ProblemDetail handleAccountNotFound(AccountNotFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle("Account not found");
+        return problem;
+    }
+
+    @ExceptionHandler(AccountUnavailableException.class)
+    public ProblemDetail handleAccountUnavailable(AccountUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "The account service is currently unreachable. Please retry later.");
+        problem.setTitle("Account service unavailable");
+        return problem;
+    }
+
+    @ExceptionHandler(AccountRejectedException.class)
+    public ProblemDetail handleAccountRejected(AccountRejectedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY,
+                "The account service rejected the transaction (downstream status "
+                        + ex.getDownstreamStatus() + ").");
+        problem.setTitle("Account service rejected the request");
         return problem;
     }
 
