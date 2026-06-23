@@ -1,6 +1,7 @@
 package com.eventledger.account.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -136,6 +137,23 @@ class AccountControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Invalid request"))
                 .andExpect(jsonPath("$.errors[0].field").value("amount"));
+    }
+
+    @Test
+    void missingRequiredFieldsReturns400ProblemDetail() throws Exception {
+        // No eventId and no currency — both are @NotBlank. Field-level detail
+        // names exactly which fields failed.
+        String body = """
+                {"type":"CREDIT","amount":10.00}
+                """;
+        mockMvc.perform(post("/accounts/{id}/transactions", "acc-missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid request"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.errors.length()").value(2))
+                .andExpect(jsonPath("$.errors[*].field", containsInAnyOrder("eventId", "currency")));
     }
 
     @Test
