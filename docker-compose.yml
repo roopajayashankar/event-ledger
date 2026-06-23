@@ -1,0 +1,38 @@
+# Event Ledger — local orchestration.
+# Skeleton: the two services only. Jaeger (tracing) and Prometheus (metrics
+# scrape) are added in a later step, alongside the OTLP/observability wiring.
+
+services:
+  account-service:
+    build:
+      context: .
+      dockerfile: account-service/Dockerfile
+    image: event-ledger/account-service:dev
+    ports:
+      - "8081:8081"
+    healthcheck:
+      # Uses the custom /health, which actively checks H2 connectivity.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  event-gateway:
+    build:
+      context: .
+      dockerfile: event-gateway/Dockerfile
+    image: event-ledger/event-gateway:dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      account-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+# Jaeger + Prometheus services land here in a later step.
