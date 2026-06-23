@@ -44,3 +44,37 @@ logging:
   structured:
     format:
       console: logstash
+
+resilience4j:
+  # Applied to RestClientAccountClient.apply/getBalance via @CircuitBreaker +
+  # @Retry (instance name "accountService"). See CLAUDE.md "Resiliency decision".
+  circuitbreaker:
+    instances:
+      accountService:
+        sliding-window-type: count_based
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50           # open at ~50% failures
+        wait-duration-in-open-state: 5s      # fast-fail while open, then probe
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          # Only genuine unavailability trips the breaker. 4xx (rejected) does
+          # not — Account is up, it just declined the request.
+          - com.eventledger.gateway.service.AccountUnavailableException
+  retry:
+    instances:
+      accountService:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true         # jitter -> avoids retry storms
+        randomized-wait-factor: 0.5
+        retry-exceptions:
+          # Retry only transient unavailability (IO, read timeout, 5xx).
+          - com.eventledger.gateway.service.AccountUnavailableException
+        ignore-exceptions:
+          # Never retry a 4xx (won't fix itself) or an open breaker (fast-fail).
+          - com.eventledger.gateway.service.AccountRejectedException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException

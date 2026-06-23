@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,10 @@ import org.springframework.test.web.servlet.MockMvc;
  * downstream first and then persisted (readable locally); on Account failure the
  * Gateway returns 503 and does <em>not</em> persist.
  */
-@SpringBootTest
+// Distinct property -> distinct cached context so this class's
+// @DynamicPropertySource (its own WireMock port) is not shared with another
+// test class that points at a different/stopped WireMock.
+@SpringBootTest(properties = "test.suite=gateway-account-integration")
 @AutoConfigureMockMvc
 class GatewayAccountIntegrationTest {
 
@@ -57,13 +61,19 @@ class GatewayAccountIntegrationTest {
         registry.add("account-service.base-url", () -> "http://localhost:" + account.port());
     }
 
-    @BeforeEach
-    void resetStub() {
-        account.resetAll();
-    }
-
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @BeforeEach
+    void resetState() {
+        account.resetAll();
+        // The breaker is shared across the cached context — reset so each test
+        // starts CLOSED and they stay independent.
+        circuitBreakerRegistry.circuitBreaker("accountService").reset();
+    }
 
     private String event(String eventId, String accountId, String amount) {
         return """

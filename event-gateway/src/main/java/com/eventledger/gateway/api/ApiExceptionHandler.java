@@ -4,6 +4,7 @@ import com.eventledger.gateway.service.AccountNotFoundException;
 import com.eventledger.gateway.service.AccountRejectedException;
 import com.eventledger.gateway.service.AccountUnavailableException;
 import com.eventledger.gateway.service.EventNotFoundException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -43,8 +44,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AccountUnavailableException.class)
     public ProblemDetail handleAccountUnavailable(AccountUnavailableException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
-                "The account service is currently unreachable. Please retry later.");
+        return accountUnavailable("The account service is currently unreachable. Please retry later.");
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ProblemDetail handleBreakerOpen(CallNotPermittedException ex) {
+        // The circuit breaker is open: fast-fail rather than hammer a down
+        // dependency. Same client-facing 503 as an outright failure.
+        return accountUnavailable(
+                "The account service is unavailable (degraded, circuit open). Please retry later.");
+    }
+
+    private ProblemDetail accountUnavailable(String detail) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
         problem.setTitle("Account service unavailable");
         return problem;
     }

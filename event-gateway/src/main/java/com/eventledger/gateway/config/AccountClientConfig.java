@@ -26,9 +26,12 @@ public class AccountClientConfig {
         ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
                 .withConnectTimeout(properties.connectTimeout())
                 .withReadTimeout(properties.readTimeout());
+        // Use a plain HTTP/1.1 factory rather than detect() (which may select the
+        // JDK HttpClient and negotiate HTTP/2). One small internal JSON call
+        // doesn't need HTTP/2, and HTTP/1.1 avoids RST_STREAM negotiation issues.
         return builder
                 .baseUrl(properties.baseUrl())
-                .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(settings))
+                .requestFactory(ClientHttpRequestFactoryBuilder.simple().build(settings))
                 .build();
     }
 }

@@ -1,6 +1,8 @@
 package com.eventledger.gateway.service;
 
 import com.eventledger.gateway.api.dto.BalanceResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -19,6 +21,14 @@ import org.springframework.web.client.RestClientException;
  *   <li>4xx → {@link AccountRejectedException} (502, not retried, not persisted)</li>
  *   <li>404 on balance → {@link AccountNotFoundException} (404)</li>
  * </ul>
+ *
+ * <p>Each call is wrapped by Resilience4j {@code @Retry} (outer) and
+ * {@code @CircuitBreaker} (inner) for the {@code accountService} instance,
+ * configured in application.yml. Only {@link AccountUnavailableException} is
+ * retried / counted as a breaker failure; {@link AccountRejectedException} (4xx)
+ * and {@code CallNotPermittedException} (open breaker) are not retried. When
+ * retries are exhausted or the breaker is open, the exception propagates and the
+ * caller maps it to 503.
  */
 @Component
 public class RestClientAccountClient implements AccountClient {
@@ -32,6 +42,8 @@ public class RestClientAccountClient implements AccountClient {
     }
 
     @Override
+    @CircuitBreaker(name = "accountService")
+    @Retry(name = "accountService")
     public void apply(ApplyTransactionCommand command) {
         AccountTransactionRequest payload = new AccountTransactionRequest(
                 command.eventId(), command.type().name(), command.amount(), command.currency());
@@ -54,6 +66,8 @@ public class RestClientAccountClient implements AccountClient {
     }
 
     @Override
+    @CircuitBreaker(name = "accountService")
+    @Retry(name = "accountService")
     public BalanceResponse getBalance(String accountId) {
         try {
             return restClient.get()
