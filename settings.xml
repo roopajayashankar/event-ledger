@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Project-local Maven settings.
+
+  Purpose: resolve dependencies directly from Maven Central, independent of
+  any host-global mirror (e.g. a corporate Artifactory configured in
+  ~/.m2/settings.xml). Passing this file with `-s` replaces the global
+  settings for the build, so the project builds the same on any machine.
+
+  Usage:
+    mvn -s settings.xml test
+    mvn -s settings.xml clean package
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <mirrors>
+        <mirror>
+            <id>maven-central</id>
+            <name>Maven Central</name>
+            <mirrorOf>*</mirrorOf>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </mirror>
+    </mirrors>
+</settings>
