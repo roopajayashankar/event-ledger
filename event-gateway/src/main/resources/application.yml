@@ -11,6 +11,11 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  mvc:
+    problemdetails:
+      # Emit RFC 7807 ProblemDetail bodies for framework-raised errors too
+      # (unknown enum value, malformed JSON, missing params), not just ours.
+      enabled: true
 
 server:
   port: 8080
