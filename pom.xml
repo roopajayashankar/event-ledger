@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      Parent / aggregator pom for the Event Ledger monorepo.
+      We inherit from spring-boot-starter-parent for curated dependency
+      management (BOM) and the build plugin defaults, and aggregate the two
+      service modules so `mvn test` from the repo root runs both.
+
+      Spring Boot 3.5.15 (latest 3.x GA) and Java 21 are deliberate, pinned
+      choices — see CLAUDE.md. Do not bump silently.
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.15</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.eventledger</groupId>
+    <artifactId>event-ledger-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>event-ledger-parent</name>
+    <description>Parent aggregator for the Event Ledger microservices</description>
+
+    <modules>
+        <module>account-service</module>
+        <module>event-gateway</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+</project>

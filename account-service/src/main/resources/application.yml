@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: account-service
+  datasource:
+    # H2 in-memory, owned solely by this service — never shared (CLAUDE.md).
+    url: jdbc:h2:mem:accountdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Custom /health is separate; these are the actuator surfaces we expose.
+        include: health,prometheus,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  # Spring Boot 3.4+ built-in structured logging: JSON, one object per line.
+  # traceId/spanId are added from MDC once Micrometer Tracing is wired (later).
+  structured:
+    format:
+      console: logstash
