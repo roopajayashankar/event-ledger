@@ -52,6 +52,16 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Stub Account Service (and inject failures) in integration tests.
+             Standalone (shaded) build to avoid Jetty/transitive clashes with
+             the app's Tomcat. See CLAUDE.md (tests: WireMock). -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.9.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
