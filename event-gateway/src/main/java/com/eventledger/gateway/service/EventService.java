@@ -24,10 +24,12 @@ public class EventService {
 
     private final EventRepository events;
     private final AccountClient accountClient;
+    private final EventMetrics metrics;
 
-    public EventService(EventRepository events, AccountClient accountClient) {
+    public EventService(EventRepository events, AccountClient accountClient, EventMetrics metrics) {
         this.events = events;
         this.accountClient = accountClient;
+        this.metrics = metrics;
     }
 
     /**
@@ -38,17 +40,30 @@ public class EventService {
      */
     @Transactional
     public SubmitResult submit(EventRequest request) {
+        String type = request.type().name();
+
         Optional<StoredEvent> existing = events.findById(request.eventId());
         if (existing.isPresent()) {
             log.debug("Duplicate eventId={} at gateway boundary — returning stored event, no work",
                     request.eventId());
+            metrics.recordOutcome(type, EventMetrics.OUTCOME_DUPLICATE);
             return new SubmitResult(existing.get(), false);
         }
 
-        // Write order: apply first (stubbed for now), persist only on success.
-        accountClient.apply(new ApplyTransactionCommand(
-                request.accountId(), request.eventId(), request.type(),
-                request.amount(), request.currency()));
+        // Write order: apply first, persist only on success. The apply call is
+        // timed; on failure we tag the outcome and rethrow (caller maps to 4xx/503).
+        try {
+            metrics.timeAccountApply(() -> accountClient.apply(new ApplyTransactionCommand(
+                    request.accountId(), request.eventId(), request.type(),
+                    request.amount(), request.currency())));
+        } catch (AccountRejectedException rejected) {
+            metrics.recordOutcome(type, EventMetrics.OUTCOME_REJECTED);
+            throw rejected;
+        } catch (RuntimeException degraded) {
+            // AccountUnavailableException or CallNotPermittedException (open breaker).
+            metrics.recordOutcome(type, EventMetrics.OUTCOME_DEGRADED);
+            throw degraded;
+        }
 
         StoredEvent toStore = new StoredEvent(
                 request.eventId(), request.accountId(), request.type(),
@@ -58,12 +73,14 @@ public class EventService {
             log.info("Stored event eventId={} account={} {} {} {}",
                     stored.getEventId(), stored.getAccountId(), stored.getType(),
                     stored.getAmount(), stored.getCurrency());
+            metrics.recordOutcome(type, EventMetrics.OUTCOME_CREATED);
             return new SubmitResult(stored, true);
         } catch (DataIntegrityViolationException race) {
             // A concurrent submission of the same eventId won the race. Idempotent
             // outcome: treat ours as a duplicate and return the stored event.
             StoredEvent stored = events.findById(request.eventId()).orElseThrow(() -> race);
             log.debug("Concurrent duplicate eventId={} — returning stored event", request.eventId());
+            metrics.recordOutcome(type, EventMetrics.OUTCOME_DUPLICATE);
             return new SubmitResult(stored, false);
         }
     }

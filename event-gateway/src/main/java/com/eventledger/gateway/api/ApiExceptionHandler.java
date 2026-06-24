@@ -1,8 +1,10 @@
 package com.eventledger.gateway.api;
 
+import com.eventledger.gateway.api.dto.EventRequest;
 import com.eventledger.gateway.service.AccountNotFoundException;
 import com.eventledger.gateway.service.AccountRejectedException;
 import com.eventledger.gateway.service.AccountUnavailableException;
+import com.eventledger.gateway.service.EventMetrics;
 import com.eventledger.gateway.service.EventNotFoundException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.util.List;
@@ -27,6 +29,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private final EventMetrics metrics;
+
+    public ApiExceptionHandler(EventMetrics metrics) {
+        this.metrics = metrics;
+    }
 
     @ExceptionHandler(EventNotFoundException.class)
     public ProblemDetail handleNotFound(EventNotFoundException ex) {
@@ -86,6 +94,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                         "message", String.valueOf(fieldError.getDefaultMessage())))
                 .toList();
         problem.setProperty("errors", errors);
+
+        // A rejected submission. Tag the type when it bound, else "unknown".
+        Object target = ex.getBindingResult().getTarget();
+        String type = (target instanceof EventRequest req && req.type() != null)
+                ? req.type().name() : "unknown";
+        metrics.recordOutcome(type, EventMetrics.OUTCOME_REJECTED);
+
         return ResponseEntity.badRequest().body(problem);
     }
 }

@@ -1,5 +1,6 @@
 package com.eventledger.gateway.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -11,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.eventledger.gateway.service.AccountClient;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -38,6 +40,9 @@ class EventControllerTest {
     @MockitoBean
     private AccountClient accountClient;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     private String event(String eventId, String accountId, String type,
                          String amount, String currency, String timestamp) {
         return """
@@ -47,6 +52,20 @@ class EventControllerTest {
 
     private void submit(String body) throws Exception {
         mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    @Test
+    void recordsCustomEventMetrics() throws Exception {
+        // A created submission populates events_submitted_total{type,outcome} and
+        // times the Account apply call.
+        submit(event("evt-metric", "acc-metric", "CREDIT", "10.00", "USD", "2026-06-01T10:00:00Z"));
+
+        double created = meterRegistry.get("events.submitted")
+                .tags("type", "CREDIT", "outcome", "created").counter().count();
+        assertThat(created).isGreaterThanOrEqualTo(1.0);
+
+        assertThat(meterRegistry.get("gateway.account.apply").timer().count())
+                .isGreaterThanOrEqualTo(1L);
     }
 
     @Test
