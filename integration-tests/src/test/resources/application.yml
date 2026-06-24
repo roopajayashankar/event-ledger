@@ -1,0 +1,16 @@
+# Config for the cross-service test context (the Gateway under @SpringBootTest).
+# Kept minimal and deterministic so it doesn't depend on which app's bundled
+# application.yml happens to be first on the classpath. The booted Account
+# Service overrides its own datasource/port via SpringApplicationBuilder.
+spring:
+  datasource:
+    url: jdbc:h2:mem:gateway-it;DB_CLOSE_DELAY=-1
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+management:
+  tracing:
+    # Not under test here; off to avoid OTLP export noise.
+    enabled: false

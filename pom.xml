@@ -30,6 +30,9 @@
     <modules>
         <module>account-service</module>
         <module>event-gateway</module>
+        <!-- Cross-service tests only; not referenced by either service module, so
+             the per-module Docker builds (-pl <svc> -am) never pull it in. -->
+        <module>integration-tests</module>
     </modules>
 
     <properties>
