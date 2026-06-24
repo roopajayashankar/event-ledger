@@ -17,12 +17,12 @@ services:
       jaeger:
         condition: service_started
     healthcheck:
-      # Uses the custom /health, which actively checks H2 connectivity.
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      # Custom /health actively checks H2 connectivity (curl is in the image).
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/health"]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 30s
+      start_period: 40s
 
   event-gateway:
     build:
@@ -33,7 +33,7 @@ services:
       - "8080:8080"
     environment:
       # Reach Account Service by its compose service name, not localhost.
-      ACCOUNT_SERVICE_BASE_URL: http://account-service:8081
+      ACCOUNT_SERVICE_URL: http://account-service:8081
       OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
     depends_on:
       account-service:
@@ -41,11 +41,11 @@ services:
       jaeger:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 30s
+      start_period: 40s
 
   jaeger:
     # all-in-one with the OTLP receiver enabled; UI on :16686.

@@ -22,8 +22,8 @@ server:
 
 account-service:
   # Where to reach the internal Account Service. Override via the
-  # ACCOUNT_SERVICE_BASE_URL env var (docker-compose) or this property (tests).
-  base-url: ${ACCOUNT_SERVICE_BASE_URL:http://localhost:8081}
+  # ACCOUNT_SERVICE_URL env var (docker-compose) or this property (tests).
+  base-url: ${ACCOUNT_SERVICE_URL:http://localhost:8081}
   # Bound latency so a slow Account can't tie up Gateway request threads.
   connect-timeout: 1s
   read-timeout: 2s
