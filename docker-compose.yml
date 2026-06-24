@@ -1,6 +1,6 @@
 # Event Ledger — local orchestration.
-# Skeleton: the two services only. Jaeger (tracing) and Prometheus (metrics
-# scrape) are added in a later step, alongside the OTLP/observability wiring.
+# Two Spring Boot services plus the observability backends: Jaeger (traces over
+# OTLP) and Prometheus (scrapes /actuator/prometheus on both services).
 
 services:
   account-service:
@@ -10,6 +10,12 @@ services:
     image: event-ledger/account-service:dev
     ports:
       - "8081:8081"
+    environment:
+      # Export spans to Jaeger's OTLP/HTTP receiver.
+      OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
+    depends_on:
+      jaeger:
+        condition: service_started
     healthcheck:
       # Uses the custom /health, which actively checks H2 connectivity.
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
@@ -28,9 +34,12 @@ services:
     environment:
       # Reach Account Service by its compose service name, not localhost.
       ACCOUNT_SERVICE_BASE_URL: http://account-service:8081
+      OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
     depends_on:
       account-service:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
       interval: 10s
@@ -38,4 +47,22 @@ services:
       retries: 5
       start_period: 30s
 
-# Jaeger + Prometheus services land here in a later step.
+  jaeger:
+    # all-in-one with the OTLP receiver enabled; UI on :16686.
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - event-gateway
+      - account-service
