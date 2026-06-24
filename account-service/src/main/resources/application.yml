@@ -29,10 +29,22 @@ management:
   endpoint:
     health:
       show-details: always
+  tracing:
+    sampling:
+      # Sample every request for the demo so traces are always visible in Jaeger.
+      probability: 1.0
+  otlp:
+    tracing:
+      # Export spans to Jaeger over OTLP/HTTP. Override via env in docker-compose.
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
 
 logging:
   # Spring Boot 3.4+ built-in structured logging: JSON, one object per line.
-  # traceId/spanId are added from MDC once Micrometer Tracing is wired (later).
+  # MDC traceId/spanId (populated by Micrometer Tracing) are included automatically.
   structured:
     format:
       console: logstash
+    json:
+      add:
+        # Static field so logs are filterable by service.
+        service: account-service

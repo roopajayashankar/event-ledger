@@ -61,6 +61,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Distributed tracing: Micrometer -> OpenTelemetry -> Jaeger (OTLP).
+             Building the RestClient from the autoconfigured RestClient.Builder
+             makes the W3C traceparent header propagate Gateway -> Account, so one
+             request is a single trace across both. Versions from the Boot BOM. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

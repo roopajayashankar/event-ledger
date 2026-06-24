@@ -2,6 +2,7 @@ package com.eventledger.gateway.api;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
@@ -14,6 +15,8 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +70,9 @@ class GatewayAccountIntegrationTest {
     @Autowired
     private CircuitBreakerRegistry circuitBreakerRegistry;
 
+    @Autowired
+    private ObservationRegistry observationRegistry;
+
     @BeforeEach
     void resetState() {
         account.resetAll();
@@ -103,6 +109,33 @@ class GatewayAccountIntegrationTest {
         mockMvc.perform(get("/events/{id}", "evt-ok"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.eventId").value("evt-ok"));
+    }
+
+    @Test
+    void propagatesW3cTraceparentHeaderToAccount() throws Exception {
+        account.stubFor(WireMock.post(urlPathMatching("/accounts/.*/transactions"))
+                .willReturn(aResponse().withStatus(201)
+                        .withHeader("Content-Type", "application/json").withBody("{}")));
+
+        // Run the request inside an active trace (as a real inbound request would
+        // be). The instrumented RestClient then injects a W3C traceparent so
+        // Account joins the same trace — one request, one trace across both.
+        // Run the request inside an active trace (as a real inbound request would
+        // be). The instrumented RestClient then injects a W3C traceparent so
+        // Account joins the same trace — one request, one trace across both.
+        Observation request = Observation.start("test.inbound", observationRegistry);
+        try (Observation.Scope scope = request.openScope()) {
+            mockMvc.perform(post("/events")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(event("evt-trace", "acc-trace", "10.00")))
+                    .andExpect(status().isCreated());
+        } finally {
+            request.stop();
+        }
+
+        account.verify(postRequestedFor(urlPathMatching("/accounts/acc-trace/transactions"))
+                .withHeader("traceparent",
+                        matching("^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")));
     }
 
     @Test
