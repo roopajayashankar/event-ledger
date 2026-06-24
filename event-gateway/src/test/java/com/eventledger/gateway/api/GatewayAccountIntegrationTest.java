@@ -112,6 +112,24 @@ class GatewayAccountIntegrationTest {
     }
 
     @Test
+    void duplicateEventIdReturns200AndMakesNoSecondAccountCall() throws Exception {
+        account.stubFor(WireMock.post(urlPathMatching("/accounts/.*/transactions"))
+                .willReturn(aResponse().withStatus(201)
+                        .withHeader("Content-Type", "application/json").withBody("{}")));
+
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                        .content(event("evt-idem", "acc-idem", "10.00")))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON)
+                        .content(event("evt-idem", "acc-idem", "10.00")))
+                .andExpect(status().isOk());
+
+        // Idempotency at the API boundary: the duplicate triggered no second
+        // downstream apply — exactly one call reached Account.
+        account.verify(1, postRequestedFor(urlPathMatching("/accounts/acc-idem/transactions")));
+    }
+
+    @Test
     void propagatesW3cTraceparentHeaderToAccount() throws Exception {
         account.stubFor(WireMock.post(urlPathMatching("/accounts/.*/transactions"))
                 .willReturn(aResponse().withStatus(201)

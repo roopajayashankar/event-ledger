@@ -93,6 +93,22 @@ class GatewayResiliencyTest {
     }
 
     @Test
+    @Order(0)
+    void retriesThreeTimesWithBackoffOnSustainedServerError() throws Exception {
+        stubApply(500);
+
+        long startNanos = System.nanoTime();
+        submit("evt-backoff", "acc-bk", 503);
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+
+        // Three attempts were made (initial + 2 retries) — retry is active.
+        account.verify(3, postRequestedFor(urlPathMatching("/accounts/acc-bk/transactions")));
+        // And they were spaced by exponential backoff (~100ms + ~200ms, jittered),
+        // not fired instantly — so the elapsed time reflects real waits.
+        assertThat(elapsedMs).isGreaterThanOrEqualTo(150L);
+    }
+
+    @Test
     @Order(1)
     void retriesTransientServerErrorThenSucceeds() throws Exception {
         account.stubFor(WireMock.post(urlPathMatching("/accounts/.*/transactions"))
